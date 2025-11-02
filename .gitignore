@@ -1,6 +1,5 @@
 /.vscode
 *.bmp
 *.o
-*.exe
-simulador
-test_all.sh
+*.sh
+*.csv
