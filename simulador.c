@@ -18,6 +18,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include "gantt_bmp.h"
+#include "gantt_ascii.h"
+#include "stats_viewer.h"
 
 // === ESTADOS DAS TAREFAS ===
 // Estado lógico das tarefas usados pelo simulador. Permite controlar o ciclo
@@ -459,6 +461,13 @@ void print_statistics(Simulator* sim) {
            avg_turnaround, avg_waiting);
 }
 
+// Função helper para limpar o buffer de entrada (stdin)
+// Isso previne que 'newlines' de entradas anteriores afetem o getchar()
+void clear_stdin_buffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
 // === MAIN ===
 /*
  * main(): fluxo principal:
@@ -502,13 +511,65 @@ int main(int argc, char* argv[]) {
         run_complete(sim);
     }
 
-    // Exibir estatísticas
-    print_statistics(sim);
+// Limpa o buffer de qualquer 'Enter' restante do modo debug ou simulação
+    clear_stdin_buffer();
 
-    // Gerar Gantt Chart
     int max_time = sim->clock.current_tick;
+    printf("\nExibir estatísticas detalhadas (s/n)? ");
+    char stats_choice = getchar();
+    clear_stdin_buffer();
+
+    if (stats_choice == 's' || stats_choice == 'S') {
+        // 1. Alocar array para o formato TaskStats
+        TaskStats* stats_array = malloc(sim->task_count * sizeof(TaskStats));
+
+        // 2. Converter TCB para TaskStats
+        for (int i = 0; i < sim->task_count; i++) {
+            TCB* t = &sim->tasks[i];
+            stats_array[i].id = t->id;
+            stats_array[i].arrival = t->arrival_time;
+            stats_array[i].burst = t->burst_time;
+            stats_array[i].completion = t->completion_time;
+            stats_array[i].turnaround = t->turnaround_time;
+            stats_array[i].waiting = t->waiting_time;
+            // O response time é (início da 1ª execução - chegada)
+            stats_array[i].response = t->start_time - t->arrival_time;
+            stats_array[i].priority = t->priority;
+        }
+
+        // 3. Chamar a nova função
+        show_statistics(stats_array, sim->task_count, sim->algorithm);
+
+        // 4. Oferecer exportação CSV
+        printf("\nDeseja exportar estas estatísticas para .csv (s/n)? ");
+        char csv_choice = getchar();
+        clear_stdin_buffer();
+        if (csv_choice == 's' || csv_choice == 'S') {
+            export_to_csv(stats_array, sim->task_count, sim->algorithm);
+        }
+
+        // 5. Liberar memória
+        free(stats_array);
+
+    } else {
+        // Usar a visualização simples
+        print_statistics(sim);
+    }
+
+// --- Gantt ASCII ---
+    printf("\nDeseja exibir o Gantt Chart ASCII no terminal (s/n)? ");
+    char ascii_choice = getchar();
+    clear_stdin_buffer();
+
+    if (ascii_choice == 's' || ascii_choice == 'S') {
+        print_gantt_ascii(sim->gantt_entries, sim->gantt_count,
+                          max_time, sim->task_count);
+    }
+
+    // Gerar Gantt Chart (BMP)
     printf("Deseja gerar o gráfico de Gantt(.bmp)? (s/n): ");
     char resposta = getchar();
+    clear_stdin_buffer();
     if (resposta == 's' || resposta == 'S') {
         create_gantt_bmp("gantt_output.bmp", sim->gantt_entries,
                         sim->gantt_count, max_time, sim->task_count);

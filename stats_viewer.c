@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "stats_viewer.h"
 
 #define BOLD    "\033[1m"
 #define RESET   "\033[0m"
@@ -11,17 +12,6 @@
 #define YELLOW  "\033[33m"
 #define CYAN    "\033[36m"
 #define BLUE    "\033[34m"
-
-typedef struct {
-    int id;
-    int arrival;
-    int burst;
-    int completion;
-    int turnaround;
-    int waiting;
-    int response;
-    int priority;
-} TaskStats;
 
 // Desenhar barra horizontal
 void draw_bar(int value, int max_value, int width, const char* color) {
@@ -160,44 +150,6 @@ void show_statistics(TaskStats* tasks, int count, const char* algorithm) {
     printf("\n");
 }
 
-// Função para comparar múltiplos algoritmos
-void compare_results(const char* filename) {
-    printf(BOLD "\nCOMPARAÇÃO ENTRE ALGORITMOS\n" RESET);
-    printf("════════════════════════════\n");
-
-    const char* algorithms[] = {"FIFO", "SRTF", "PRIORITY"};
-    float results[3][2]; // [algoritmo][métrica: turnaround, waiting]
-
-    for (int a = 0; a < 3; a++) {
-        // Simular para cada algoritmo (simplificado)
-        printf("\n" CYAN "%s:" RESET "\n", algorithms[a]);
-
-        // Aqui você executaria a simulação real
-        // Por enquanto, valores de exemplo
-        results[a][0] = 20.0 + (a * 5); // turnaround
-        results[a][1] = 10.0 + (a * 3); // waiting
-
-        printf("  Turnaround médio: %.2f\n", results[a][0]);
-        printf("  Espera média: %.2f\n", results[a][1]);
-    }
-
-    // Identificar melhor algoritmo
-    printf("\n" BOLD "RECOMENDAÇÃO:\n" RESET);
-    printf("──────────────\n");
-
-    int best_turnaround = 0;
-    int best_waiting = 0;
-
-    for (int i = 1; i < 3; i++) {
-        if (results[i][0] < results[best_turnaround][0]) best_turnaround = i;
-        if (results[i][1] < results[best_waiting][1]) best_waiting = i;
-    }
-
-    printf(GREEN "✓" RESET " Melhor turnaround: %s (%.2f ticks)\n",
-           algorithms[best_turnaround], results[best_turnaround][0]);
-    printf(GREEN "✓" RESET " Melhor tempo de espera: %s (%.2f ticks)\n",
-           algorithms[best_waiting], results[best_waiting][1]);
-}
 
 // Exportar estatísticas para CSV
 void export_to_csv(TaskStats* tasks, int count, const char* algorithm) {

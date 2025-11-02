@@ -134,3 +134,13 @@ help:
 	@echo "  make help          - Mostra esta ajuda"
 
 .PHONY: all clean test-fifo test-srtf test-priority test-debug test-all test-complex help
+
+# --- Regras de Dependência de Cabeçalho ---
+# Garante que os arquivos .o sejam recompilados se
+# os arquivos .h dos quais eles dependem mudarem.
+
+simulador.o: simulador.c gantt_bmp.h gantt_ascii.h stats_viewer.h
+interface.o: interface.c gantt_bmp.h gantt_ascii.h
+gantt_ascii.o: gantt_ascii.c gantt_bmp.h
+gantt_bmp.o: gantt_bmp.c gantt_bmp.h
+stats_viewer.o: stats_viewer.c stats_viewer.h
