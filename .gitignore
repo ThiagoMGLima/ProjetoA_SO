@@ -3,3 +3,4 @@
 *.o
 *.exe
 simulador
+test_all.sh
