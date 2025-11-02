@@ -1,41 +1,74 @@
 # Simulador de Sistema Operacional Multitarefa
 
-## 📋 Status de Implementação
+> Simulador educacional de escalonamento de processos com visualização em terminal e geração de Gantt (BMP). Implementação standalone sem dependências externas.
 
-### ✅ Implementado:
-- [x] Geração de gráfico de Gantt em BMP (standalone)
-- [x] Parser de arquivo de configuração
-- [x] Task Control Block (TCB)
-- [x] Sistema de clock com ticks
-- [x] Algoritmo FIFO
-- [x] Algoritmo SRTF (Shortest Remaining Time First)
-- [x] Algoritmo Priority (com preempção)
-- [x] Modo de execução completa
-- [x] Modo de execução passo-a-passo (debug)
-- [x] Cálculo de estatísticas (turnaround, waiting time)
-- [x] Visualização ASCII no terminal
-- [x] Compilação 100% standalone (sem dependências)
+---
 
-## 🛠️ Compilação
+## Conteúdo rápido
+- 📦 Compilação: `make`
+- ▶️ Execução: `./simulador config.txt`
+- 🧪 Testes: `make test-all`
+- ✍️ Formato do arquivo de configuração: veja a seção **Configuração** abaixo
 
+---
+
+## Descrição
+Este projeto simula um núcleo de escalonamento de processos (CPU única) com suporte a múltiplos algoritmos (FIFO, SRTF e Priority), modo passo-a-passo (debug), Gantt gráfico em BMP e saída ASCII no terminal. Foi desenvolvido para uso didático e como base para extensões (I/O, mutexes, múltiplas CPUs, etc.).
+
+> Trabalho base produzido por Dr. Marco Aurélio Wehrmeister implementada por mim Thiago Moreira
+
+---
+
+## Principais recursos (implementados)
+- Parser de arquivo de configuração robusto (linhas vazias e campos opcionais)
+- Task Control Block (TCB) para cada tarefa
+- Relógio por ticks e sistema de scheduler modular
+- Algoritmos: FIFO (não preemptivo), SRTF (preemptivo), Priority (preemptivo)
+- Execução completa e modo passo-a-passo (debug)
+- Geração de gráfico de Gantt em BMP (implementado manualmente, sem bibliotecas)
+- Visualização ASCII no terminal
+- Cálculo de estatísticas: turnaround time, waiting time
+- Compilação standalone (binário sem dependências dinamicamente vinculadas esperadas)
+
+---
+
+## Requisitos
+- Compilador C (gcc recomendado)
+- Make (opcional, facilita testes)
+- Sistema operacional UNIX-like para os exemplos (Linux / macOS). O código é em C e pode ser portado para Windows com ajustes no Makefile.
+
+---
+
+## Como compilar
 ```bash
-# Compilar o simulador
+# Usando Makefile (recomendado)
 make
 
-# Ou manualmente:
+# Ou compilação manual (exemplo):
 gcc -static -O2 simulator.c gantt_bmp.c -o simulador -lm
 ```
 
-## 🚀 Como Usar
+> Verifique o resultado com `ldd simulador` (Linux) para checar bibliotecas vinculadas, se desejar.
 
-### 1. Formato do Arquivo de Configuração
+---
 
+## Formato do arquivo de configuração
+O arquivo de configuração controla o algoritmo e lista as tarefas.
+
+**Linha 1:** `algoritmo_escalonamento;quantum` (quantum pode ser ignorado para algoritmos que não usam quantum)
+
+**Linhas seguintes (uma por tarefa):**
 ```
-algoritmo_escalonamento;quantum
 id;cor;ingresso;duracao;prioridade;lista_eventos
 ```
+- `id`: identificador numérico da tarefa (ex.: `0`, `1`)
+- `cor`: cor em hex para o Gantt (ex.: `#FF0000`) — opcional, usar `#000000` como padrão
+- `ingresso`: tick de chegada (integer, ex.: `5`)
+- `duracao`: tempo de CPU necessário (integer)
+- `prioridade`: inteiro, menor valor = maior prioridade
+- `lista_eventos`: campo reservado para eventos (I/O, mutex). Atualmente não usado — deixe vazio ou remova.
 
-Exemplo (`config.txt`):
+**Exemplo completo (`config.txt`):**
 ```
 FIFO;10
 0;#FF0000;0;20;1;
@@ -43,152 +76,94 @@ FIFO;10
 2;#0000FF;10;10;3;
 ```
 
-### 2. Executar Simulação
+---
 
-#### Modo Normal (execução completa):
+## Uso
+### Execução (modo normal)
+```bash
+./visualizador
+```
+ou para teste rapido:
 ```bash
 ./simulador config.txt
 ```
 
-#### Modo Debug (passo-a-passo):
+### Modo debug (passo-a-passo)
 ```bash
 ./simulador config.txt --step
 ```
-
 No modo debug, comandos disponíveis:
-- `Enter` - Próximo tick
-- `c` - Continuar execução completa
-- `i` - Inspecionar estado do sistema
-- `q` - Sair
+- `Enter` — avançar 1 tick
+- `c` — continuar execução completa
+- `i` — inspecionar estado (fila, TCBs, tick atual)
+- `q` — sair
 
-### 3. Saídas Geradas
+---
 
-- **Terminal**: Visualização ASCII e estatísticas
-- **gantt_output.bmp**: Gráfico de Gantt visual
+## Saídas
+- **Terminal**: logs em ASCII (chegadas, mudanças de contexto, conclusão) e tabela de estatísticas
+- **Arquivo BMP**: `gantt_output.bmp` com o gráfico de Gantt da execução
 
-## 📊 Algoritmos de Escalonamento
-
-### FIFO (First In First Out)
-- Não-preemptivo
-- Ordem de chegada
-
-### SRTF (Shortest Remaining Time First)
-- Preemptivo
-- Menor tempo restante primeiro
-
-### PRIORITY
-- Preemptivo
-- Menor valor = maior prioridade
-
-## 🧪 Testes Rápidos
-
-```bash
-# Testar FIFO
-make test-fifo
-
-# Testar SRTF
-make test-srtf
-
-# Testar Priority
-make test-priority
-
-# Testar modo debug
-make test-debug
-
-# Executar todos os testes
-make test-all
-
-# Caso complexo com 6 tarefas
-make test-complex
-```
-
-## 📂 Estrutura de Arquivos
-
-```
-projeto/
-├── simulator.c      # Núcleo do simulador
-├── gantt_bmp.c     # Geração de BMP
-├── gantt_bmp.h     # Header do Gantt
-├── Makefile        # Build do projeto
-├── test_config.txt # Arquivo de teste
-└── README.md       # Esta documentação
-```
-
-## 📈 Exemplo de Saída
-
+### Exemplo resumido de saída
 ```
 === INICIANDO SIMULAÇÃO (FIFO) ===
 [Tick 0] Tarefa 0 chegou
 [Tick 0] Executando tarefa 0
 [Tick 5] Tarefa 1 chegou
-[Tick 10] Tarefa 2 chegou
 [Tick 19] Tarefa 0 concluída
-[Tick 20] Executando tarefa 1
 ...
-
 === ESTATÍSTICAS DAS TAREFAS ===
 ID | Arrival | Burst | Complete | Turnaround | Waiting
 ---|---------|-------|----------|------------|--------
  0 |       0 |    20 |       20 |         20 |       0
- 1 |       5 |    15 |       35 |         30 |      15
- 2 |      10 |    10 |       45 |         35 |      25
-
 Médias: Turnaround = 28.33, Waiting = 13.33
 Gantt chart salvo em: gantt_output.bmp
 ```
 
-## 🎯 Requisitos Atendidos
+---
 
-### Requisitos Gerais:
-- ✅ Simulação de SO multitarefa preemptivo
-- ✅ Visualização gráfica (BMP)
-- ✅ Sistema configurável
-- ✅ Executável standalone
-- ✅ Código comentado
+## Algoritmos suportados
+- **FIFO** — First In First Out (não-preemptivo)
+- **SRTF** — Shortest Remaining Time First (preemptivo)
+- **PRIORITY** — Prioridade (preemptivo; menor valor = maior prioridade)
 
-### Projeto A:
-- ✅ Relógio com ticks
-- ✅ CPU única
-- ✅ TCB para tarefas
-- ✅ Características de tempo
-- ✅ Modo passo-a-passo
-- ✅ Modo execução completa
-- ✅ Gráfico de Gantt
-- ✅ Arquivo de imagem (BMP)
-- ✅ Configuração por arquivo
-- ✅ Algoritmos FIFO, SRTF, Priority
-- ✅ Escalonador modular
+---
 
-## 🐛 Debugging
-
-Para verificar se é realmente standalone:
+## Testes (Makefile)
+O Makefile inclui alvos para testar cenários pré-definidos:
 ```bash
-# Linux
-ldd simulador
-
-# Windows
-objdump -p simulador.exe | grep DLL
-
-# MacOS
-otool -L simulador
+make test-fifo
+make test-srtf
+make test-priority
+make test-debug
+make test-all
+make test-complex
 ```
 
-## 📝 Notas de Implementação
+---
 
-1. **BMP Manual**: Implementado sem bibliotecas externas
-2. **Parser Robusto**: Suporta linhas vazias e campos opcionais
-3. **Gantt Otimizado**: Agrupa execuções contínuas
-4. **Estatísticas Completas**: Turnaround e waiting time calculados
+## Estrutura de arquivos
+```
+projeto/
+├── simulator.c      # Núcleo do simulador
+├── gantt_bmp.c      # Geração de BMP
+├── gantt_bmp.h      # Header do Gantt
+├── Makefile         # Build e targets de teste
+├── test_config.txt  # Exemplo de configuração/teste
+└── README.md        # Documentação (esta)
+```
 
-## 🚧 Próximos Passos (Projeto B)
+---
 
-1. Implementar eventos (mutex, I/O)
-2. Adicionar múltiplas CPUs
-3. Resolver inversão de prioridade
-4. Implementar Round Robin
-5. Adicionar mais visualizações
+## Desenvolvimento futuro (roadmap)
+- Implementar eventos reais (I/O, mutex, semáforos)
+- Round Robin (quantum)
+- Suporte a múltiplas CPUs
+- Tratamento de inversão de prioridade
+- Exportação para formatos além de BMP (PNG, SVG)
 
-## 📧 Autor
+---
 
-Prof. Dr. Marco Aurélio Wehrmeister
-Implementação do simulador conforme especificação v0.1
+## Licença
+Este projeto não possui licença explicitada no repositório original. Recomenda-se adicionar uma licença (ex.: MIT) se desejar permitir contribuições de terceiros.
+
