@@ -2,6 +2,7 @@
 #define GANTT_BMP_H
 
 #include <stdint.h>
+#include <limits.h>
 
 // Estrutura pública para entradas do Gantt
 typedef struct {

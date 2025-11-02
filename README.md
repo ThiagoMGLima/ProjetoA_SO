@@ -16,12 +16,6 @@
 - [x] Visualização ASCII no terminal
 - [x] Compilação 100% standalone (sem dependências)
 
-### 🔄 Em Desenvolvimento (Projeto B):
-- [ ] Eventos (mutex, I/O)
-- [ ] Múltiplas CPUs/cores
-- [ ] Problemas de inversão de prioridade
-- [ ] Round Robin com quantum
-
 ## 🛠️ Compilação
 
 ```bash

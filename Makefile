@@ -21,7 +21,7 @@ ifdef OS
 endif
 
 # Arquivos fonte
-SRCS = simulator.c gantt_bmp.c
+SRCS = simulador.c gantt_bmp.c
 OBJS = $(SRCS:.c=.o)
 
 # Regra principal
@@ -35,7 +35,7 @@ $(TARGET): $(OBJS)
 	@echo ""
 	@echo "Para testar, execute:"
 	@echo "  ./$(TARGET) test_config.txt"
-	@echo "  ./$(TARGET) test_config.txt --step"
+	@echo "  ./$(TARGET) test_config.txt --step (modo para debug)"
 
 # Compilar objetos
 %.o: %.c

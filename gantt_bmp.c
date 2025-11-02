@@ -1,11 +1,9 @@
-// gantt_bmp.c - ImplementaÃ§Ã£o completa de geraÃ§Ã£o BMP
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include "gantt_bmp.h"
-
 
 
 // Estrutura para o header BMP
@@ -20,12 +18,12 @@ typedef struct {
 
 typedef struct {
     uint32_t header_size;       // 40
-    int32_t  width;            
-    int32_t  height;           
+    int32_t  width;
+    int32_t  height;
     uint16_t planes;            // 1
     uint16_t bits_per_pixel;   // 24
-    uint32_t compression;       // 0 (sem compressÃ£o)
-    uint32_t image_size;        
+    uint32_t compression;       // 0 (sem compressao)
+    uint32_t image_size;
     int32_t  x_pixels_per_meter; // 2835
     int32_t  y_pixels_per_meter; // 2835
     uint32_t colors_used;       // 0
@@ -42,14 +40,14 @@ typedef struct {
 Color hex_to_rgb(const char* hex) {
     Color c = {0, 0, 0};
     if (hex[0] == '#') hex++;
-    
+
     unsigned int value;
     sscanf(hex, "%06x", &value);
-    
+
     c.r = (value >> 16) & 0xFF;
     c.g = (value >> 8) & 0xFF;
     c.b = value & 0xFF;
-    
+
     return c;
 }
 
@@ -116,22 +114,22 @@ static void draw_text_buf(uint8_t *image, int row_size, int width, int height,
     }
 }
 
-void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count, 
+void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count,
                       int total_time, int task_count) {
-    
-    // DimensÃµes da imagem
+
+    // Dimensoes da imagem
     int width = 800;
     int height = 50 * task_count + 100;  // 50 pixels por tarefa + margens
     int row_height = 40;
     int time_scale = width / (total_time + 1);  // pixels por unidade de tempo
-    
+
     // Calcular padding (BMP precisa de linhas mÃºltiplas de 4 bytes)
     int padding = (4 - (width * 3) % 4) % 4;
     int row_size = width * 3 + padding;
-    
+
     // Alocar buffer para a imagem
     uint8_t* image = calloc(row_size * height, 1);
-    
+
     // Preencher com branco
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
@@ -141,7 +139,7 @@ void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count
             image[idx + 2] = 255; // R
         }
     }
-    
+
     // Desenhar grade de tempo (linhas verticais)
     for (int t = 0; t <= total_time; t++) {
         int x = t * time_scale;
@@ -153,7 +151,7 @@ void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count
             image[idx + 2] = 200;
         }
     }
-    
+
     // Draw numeric labels for each time tick near the top (small, black)
     Color label_col = {0, 0, 0};
     for (int t = 0; t <= total_time; t++) {
@@ -164,16 +162,16 @@ void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count
         int scale = 1;
         draw_text_buf(image, row_size, width, height, buf, x, y_label, scale, label_col);
     }
-    
-    // Desenhar execuÃ§Ãµes das tarefas
+
+    // Desenhar execucoes das tarefas
     for (int i = 0; i < entry_count; i++) {
         Color task_color = hex_to_rgb(entries[i].color);
-        
+
         int y_start = 50 + entries[i].task_id * row_height;
         int y_end = y_start + 30;  // Altura da barra
         int x_start = entries[i].start_time * time_scale;
         int x_end = entries[i].end_time * time_scale;
-        
+
         // Preencher retÃ¢ngulo
         for (int y = y_start; y < y_end && y < height; y++) {
             for (int x = x_start; x < x_end && x < width; x++) {
@@ -184,7 +182,7 @@ void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count
             }
         }
     }
-    
+
 
     // Preparar headers
     BMPFileHeader file_header = {
@@ -194,7 +192,7 @@ void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count
         .reserved2 = 0,
         .offset = 54
     };
-    
+
     BMPInfoHeader info_header = {
         .header_size = 40,
         .width = width,
@@ -208,20 +206,20 @@ void create_gantt_bmp(const char* filename, GanttEntry* entries, int entry_count
         .colors_used = 0,
         .important_colors = 0
     };
-    
+
     // Escrever arquivo
     FILE* f = fopen(filename, "wb");
     if (!f) {
         free(image);
         return;
     }
-    
+
     fwrite(&file_header, sizeof(BMPFileHeader), 1, f);
     fwrite(&info_header, sizeof(BMPInfoHeader), 1, f);
     fwrite(image, 1, row_size * height, f);
-    
+
     fclose(f);
     free(image);
-    
+
     printf("Gantt chart salvo em: %s\n", filename);
 }
