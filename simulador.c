@@ -88,9 +88,6 @@ typedef struct {
 
 // === PARSER DE CONFIGURAÇÃO ===
 // Lê o arquivo de configuração no formato esperado e popula uma SimConfig.
-// Formato esperado (exemplo):
-//   FIFO;10
-//   0;#FF0000;0;20;1;
 // Cada linha de tarefa: id;color;arrival;burst;priority;...
 SimConfig* parse_config(const char* filename) {
     FILE* f = fopen(filename, "r");
