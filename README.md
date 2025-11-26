@@ -1,169 +1,162 @@
-# Simulador de Sistema Operacional Multitarefa
+# Simulador de Escalonamento de Processos
 
-> Simulador educacional de escalonamento de processos com visualização em terminal e geração de Gantt (BMP). Implementação standalone sem dependências externas.
+Simulador de escalonamento de processos multitarefa preemptivo desenvolvido para a disciplina de Sistemas Operacionais.
 
----
+## Requisitos Atendidos
 
-## Conteúdo rápido
-- 📦 Compilação: `make`
-- ▶️ Execução: `./simulador config.txt`
-- 🧪 Testes: `make test-all`
-- ✍️ Formato do arquivo de configuração: veja a seção **Configuração** abaixo
+| Requisito | Descrição | Status |
+|-----------|-----------|--------|
+| 1.1 | TCB com campos obrigatórios | ✅ |
+| 1.2 | Algoritmos FIFO, RR, SRTF, Priority | ✅ |
+| 1.3 | Diagrama de Gantt (ASCII e BMP) | ✅ |
+| 1.4 | Estatísticas (turnaround, waiting, etc.) | ✅ |
+| 1.5.1 | Modo passo-a-passo | ✅ |
+| 1.5.2 | Retroceder simulação | ✅ |
+| 1.5.3 | Execução completa | ✅ |
+| 1.6 | Código comentado | ✅ |
 
----
+## Compilação
 
-## Descrição
-Este projeto simula um núcleo de escalonamento de processos (CPU única) com suporte a múltiplos algoritmos (FIFO, SRTF e Priority), modo passo-a-passo (debug), Gantt gráfico em BMP e saída ASCII no terminal. Foi desenvolvido para uso didático e como base para extensões (I/O, mutexes, múltiplas CPUs, etc.).
-
-> Trabalho base produzido por Dr. Marco Aurélio Wehrmeister implementada por mim Thiago Moreira
-
----
-
-## Principais recursos (implementados)
-- Parser de arquivo de configuração robusto (linhas vazias e campos opcionais)
-- Task Control Block (TCB) para cada tarefa
-- Relógio por ticks e sistema de scheduler modular
-- Algoritmos: FIFO (não preemptivo), SRTF (preemptivo), Priority (preemptivo)
-- Execução completa e modo passo-a-passo (debug)
-- Geração de gráfico de Gantt em BMP (implementado manualmente, sem bibliotecas)
-- Visualização ASCII no terminal
-- Cálculo de estatísticas: turnaround time, waiting time
-- Compilação standalone (binário sem dependências dinamicamente vinculadas esperadas)
-
----
-
-## Requisitos
-- Compilador C (gcc recomendado)
-- Make (opcional, facilita testes)
-- Sistema operacional UNIX-like para os exemplos (Linux / macOS). O código é em C e pode ser portado para Windows com ajustes no Makefile.
-
----
-
-## Como compilar
 ```bash
-# Usando Makefile (recomendado)
+make clean
 make
-
-# Ou compilação manual (exemplo):
-gcc -static -O2 simulator.c gantt_bmp.c -o simulador -lm
 ```
 
-> Verifique o resultado com `ldd simulador` (Linux) para checar bibliotecas vinculadas, se desejar.
-
----
-
-## Formato do arquivo de configuração
-O arquivo de configuração controla o algoritmo e lista as tarefas.
-
-**Linha 1:** `algoritmo_escalonamento;quantum` (quantum pode ser ignorado para algoritmos que não usam quantum)
-
-**Linhas seguintes (uma por tarefa):**
-```
-id;cor;ingresso;duracao;prioridade;lista_eventos
-```
-- `id`: identificador numérico da tarefa (ex.: `0`, `1`)
-- `cor`: cor em hex para o Gantt (ex.: `#FF0000`) — opcional, usar `#000000` como padrão
-- `ingresso`: tick de chegada (integer, ex.: `5`)
-- `duracao`: tempo de CPU necessário (integer)
-- `prioridade`: inteiro, menor valor = maior prioridade
-- `lista_eventos`: campo reservado para eventos (I/O, mutex). Atualmente não usado — deixe vazio ou remova.
-
-**Exemplo completo (`config.txt`):**
-```
-FIFO;10
-0;#FF0000;0;20;1;
-1;#00FF00;5;15;2;
-2;#0000FF;10;10;3;
-```
-
----
+Gera dois executáveis:
+- `simulador` - Simulador principal com linha de comando
+- `interface` - Interface interativa com menus
 
 ## Uso
-### Execução (modo normal)
+
+### Simulador (linha de comando)
+
 ```bash
-./visualizador
-```
-ou para teste rapido:
-```bash
+# Execução interativa
 ./simulador config.txt
+
+# Com opções
+./simulador config.txt --step      # Modo debug passo-a-passo
+./simulador config.txt --bmp       # Gerar BMP automaticamente
+./simulador config.txt --ascii     # Mostrar Gantt ASCII
+./simulador config.txt --quiet     # Modo silencioso
 ```
 
-### Modo debug (passo-a-passo)
+### Interface Interativa
+
 ```bash
-./simulador config.txt --step
-```
-No modo debug, comandos disponíveis:
-- `Enter` — avançar 1 tick
-- `c` — continuar execução completa
-- `i` — inspecionar estado (fila, TCBs, tick atual)
-- `q` — sair
-
----
-
-## Saídas
-- **Terminal**: logs em ASCII (chegadas, mudanças de contexto, conclusão) e tabela de estatísticas
-- **Arquivo BMP**: `gantt_output.bmp` com o gráfico de Gantt da execução
-
-### Exemplo resumido de saída
-```
-=== INICIANDO SIMULAÇÃO (FIFO) ===
-[Tick 0] Tarefa 0 chegou
-[Tick 0] Executando tarefa 0
-[Tick 5] Tarefa 1 chegou
-[Tick 19] Tarefa 0 concluída
-...
-=== ESTATÍSTICAS DAS TAREFAS ===
-ID | Arrival | Burst | Complete | Turnaround | Waiting
----|---------|-------|----------|------------|--------
- 0 |       0 |    20 |       20 |         20 |       0
-Médias: Turnaround = 28.33, Waiting = 13.33
-Gantt chart salvo em: gantt_output.bmp
+./interface
 ```
 
----
+## Modo Debug (Passo-a-Passo)
 
-## Algoritmos suportados
-- **FIFO** — First In First Out (não-preemptivo)
-- **SRTF** — Shortest Remaining Time First (preemptivo)
-- **PRIORITY** — Prioridade (preemptivo; menor valor = maior prioridade)
+O modo debug (`--step`) oferece **visualização gráfica em tempo real**:
 
----
+### Comandos Disponíveis
 
-## Testes (Makefile)
-O Makefile inclui alvos para testar cenários pré-definidos:
-```bash
-make test-fifo
-make test-srtf
-make test-priority
-make test-debug
-make test-all
-make test-complex
+| Comando | Descrição |
+|---------|-----------|
+| `Enter` | Avança 1 tick e mostra gráfico |
+| `n` | Avança N ticks |
+| `b` | Retrocede 1 tick |
+| `g` | Vai para tick específico |
+| `v` | Ver gráfico de Gantt progressivo |
+| `d` | Ver diagrama de estados/filas |
+| `i` | Ver tabela de estados |
+| `a` | Mostrar tudo (gráfico + diagrama + tabela) |
+| `t` | Toggle: ativar/desativar gráfico automático |
+| `c` | Continuar até o fim |
+| `q` | Sair |
+| `?` | Ajuda |
+
+### Gráfico de Gantt Progressivo
+
+Mostra o gráfico sendo construído tick a tick:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║              GANTT CHART PROGRESSIVO                         ║
+╚══════════════════════════════════════════════════════════════╝
+
+      0    5    10   15   20
+      │···▼│····│····│····│····  ◄ Tick 4
+      ──────────────────────────
+T0  R ███·░░░░░░░░░░░░░░░░░░░░  [wait]
+T1  * ···█░░░░░░░░░░░░░░░░░░░░  [1/6]
+T2  R ····░░░░░░░░░░░░░░░░░░░░  [wait]
+      ──────────────────────────
+
+Legenda: █=Executando  ·=Esperando  ░=Futuro  ▼=Tick atual
+Estados: N=New  R=Ready  *=Running  B=Blocked  D=Done
 ```
 
----
+### Diagrama de Estados
 
-## Estrutura de arquivos
+Mostra visualmente as filas do escalonador:
+
 ```
-projeto/
-├── simulator.c      # Núcleo do simulador
-├── gantt_bmp.c      # Geração de BMP
-├── gantt_bmp.h      # Header do Gantt
-├── Makefile         # Build e targets de teste
-├── test_config.txt  # Exemplo de configuração/teste
-└── README.md        # Documentação (esta)
+┌──────────────────────────────────────────────────────┐
+│                    DIAGRAMA DE ESTADOS                 │
+└──────────────────────────────────────────────────────────┘
+
+  CPU: [T1]
+  READY: [T0] [T2]
+  WAITING: [vazia]
+  DONE: [vazia]
+
+  Progresso: [███████░░░░░░░░░░░░░░░░░░░░░░░] 25%
 ```
 
----
+## Formato do Arquivo de Configuração
 
-## Desenvolvimento futuro (roadmap)
-- Implementar eventos reais (I/O, mutex, semáforos)
-- Round Robin (quantum)
-- Suporte a múltiplas CPUs
-- Tratamento de inversão de prioridade
-- Exportação para formatos além de BMP (PNG, SVG)
+```
+ALGORITMO;QUANTUM
+ID;COR;CHEGADA;BURST;PRIORIDADE;
+```
 
----
+### Exemplo (Round-Robin com quantum 3)
 
-## Licença
-Este projeto não possui licença explicitada no repositório original. Recomenda-se adicionar uma licença (ex.: MIT) se desejar permitir contribuições de terceiros.
+```
+RR;3
+0;#FF0000;0;10;1;
+1;#00FF00;1;6;2;
+2;#0000FF;2;4;3;
+```
 
+### Algoritmos Disponíveis
+
+| Algoritmo | Descrição |
+|-----------|-----------|
+| `FIFO` | First In, First Out (não-preemptivo) |
+| `RR` | Round-Robin (preemptivo com quantum) |
+| `SRTF` | Shortest Remaining Time First (preemptivo) |
+| `PRIORITY` | Por prioridade (preemptivo, menor = maior prioridade) |
+
+## Estrutura de Arquivos
+
+```
+├── simulador.c      # Código principal (com visualização debug)
+├── interface.c      # Interface interativa
+├── gantt_bmp.c/h    # Geração de BMP
+├── gantt_ascii.c/h  # Visualização ASCII
+├── stats_viewer.c/h # Estatísticas
+├── Makefile         # Script de compilação
+└── exemplo_*.txt    # Arquivos de exemplo
+```
+
+## Exemplos Incluídos
+
+- `exemplo_fifo.txt` - FIFO com 3 tarefas
+- `exemplo_rr.txt` - Round-Robin com quantum 3
+- `exemplo_srtf.txt` - SRTF com preempção
+- `exemplo_priority.txt` - Escalonamento por prioridade
+
+## Preparação para Projeto B
+
+O código já inclui estruturas preparadas para o Projeto B:
+- Estrutura `TaskEvent` para eventos de mutex e I/O
+- Campos `io_remaining`, `events[]` no TCB
+- Parser de eventos (`parse_events()`)
+
+## Autor
+
+Desenvolvido para a disciplina de Sistemas Operacionais.

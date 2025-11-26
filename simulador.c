@@ -2,7 +2,7 @@
  * =============================================================================
  * Simulador de Escalonamento de Processos - Versão 2.0
  * =============================================================================
- * 
+ *
  * Este arquivo implementa um simulador de sistema operacional multitarefa
  * preemptivo de tempo compartilhado, conforme especificado no projeto.
  *
@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <limits.h>
 #include "gantt_bmp.h"
 #include "gantt_ascii.h"
 #include "stats_viewer.h"
@@ -88,31 +89,31 @@ typedef struct {
     // Identificação
     int id;                     // ID único da tarefa
     char color[8];              // Cor em hexadecimal (#RRGGBB)
-    
+
     // Parâmetros de tempo
     int arrival_time;           // Instante de chegada ao sistema
     int burst_time;             // Tempo total de CPU necessário
     int remaining_time;         // Tempo restante de CPU
     int priority;               // Prioridade (menor = mais prioritário)
-    
+
     // Estado atual
     TaskState state;            // Estado atual da tarefa
-    
+
     // Estatísticas (atualizadas durante/após simulação)
     int start_time;             // Primeiro instante de execução (-1 se não iniciou)
     int completion_time;        // Instante de término
     int turnaround_time;        // Tempo total no sistema (completion - arrival)
     int waiting_time;           // Tempo esperando na fila de prontos
     int response_time;          // Tempo até primeira execução (start - arrival)
-    
+
     // Controle de quantum (para RR)
     int quantum_remaining;      // Ticks restantes do quantum atual
-    
+
     // Eventos (Projeto B)
     TaskEvent events[MAX_EVENTS];
     int event_count;
     int next_event_idx;         // Índice do próximo evento a processar
-    
+
     // I/O (Projeto B)
     int io_remaining;           // Tempo restante de I/O (0 = não está em I/O)
 } TCB;
@@ -159,17 +160,17 @@ typedef struct {
     int task_count;             // Número de tarefas
     TCB* current_task;          // Ponteiro para tarefa em execução
     char algorithm[20];         // Algoritmo de escalonamento
-    
+
     // Gantt Chart
     GanttEntry* gantt_entries;  // Entradas para o gráfico de Gantt
     int gantt_count;            // Número de entradas
     int gantt_capacity;         // Capacidade alocada
-    
+
     // Sistema de histórico (para retrocesso)
     Snapshot* history;          // Array de snapshots
     int history_count;          // Número de snapshots salvos
     int history_capacity;       // Capacidade alocada
-    
+
     // Controle
     bool verbose;               // Modo verboso (imprime cada tick)
 } Simulator;
@@ -208,23 +209,23 @@ GanttEntry* copy_gantt(GanttEntry* src, int count) {
 /**
  * Faz o parse de uma lista de eventos de uma tarefa.
  * Formato esperado: "MLxx:tt,MUxx:tt,IO:tt-dd,..."
- * 
+ *
  * Esta função prepara a estrutura para o Projeto B.
  */
 void parse_events(TCB* task, const char* event_str) {
     task->event_count = 0;
     task->next_event_idx = 0;
-    
+
     if (!event_str || strlen(event_str) == 0) return;
-    
+
     char buffer[256];
     strncpy(buffer, event_str, sizeof(buffer) - 1);
     buffer[sizeof(buffer) - 1] = '\0';
-    
+
     char* token = strtok(buffer, ",");
     while (token && task->event_count < MAX_EVENTS) {
         TaskEvent* ev = &task->events[task->event_count];
-        
+
         if (strncmp(token, "ML", 2) == 0) {
             // Mutex Lock: MLxx:tt
             ev->type = EVENT_MUTEX_LOCK;
@@ -243,18 +244,18 @@ void parse_events(TCB* task, const char* event_str) {
             sscanf(token, "IO:%d-%d", &ev->time, &ev->param);
             task->event_count++;
         }
-        
+
         token = strtok(NULL, ",");
     }
 }
 
 /**
  * Carrega a configuração da simulação a partir de um arquivo texto.
- * 
+ *
  * Formato do arquivo:
  *   Linha 1: algoritmo;quantum[;alpha]
  *   Linhas seguintes: id;cor;ingresso;duracao;prioridade;[eventos]
- * 
+ *
  * @param filename Nome do arquivo de configuração
  * @return Ponteiro para SimConfig ou NULL em caso de erro
  */
@@ -264,20 +265,20 @@ SimConfig* parse_config(const char* filename) {
         printf("Erro: Não foi possível abrir o arquivo '%s'\n", filename);
         return NULL;
     }
-    
+
     SimConfig* config = malloc(sizeof(SimConfig));
     if (!config) {
         fclose(f);
         return NULL;
     }
-    
+
     // Inicializar valores padrão
     config->alpha = 1;
     config->quantum = 10;
     strcpy(config->algorithm, "FIFO");
-    
+
     char line[MAX_LINE_LEN];
-    
+
     // Primeira linha: parâmetros do sistema
     if (!fgets(line, sizeof(line), f)) {
         printf("Erro: Arquivo de configuração vazio\n");
@@ -285,46 +286,46 @@ SimConfig* parse_config(const char* filename) {
         free(config);
         return NULL;
     }
-    
+
     // Remover newline
     line[strcspn(line, "\r\n")] = '\0';
-    
+
     // Parse da primeira linha: algoritmo;quantum[;alpha]
     char* tok = strtok(line, ";");
     if (tok) strncpy(config->algorithm, tok, sizeof(config->algorithm) - 1);
-    
+
     tok = strtok(NULL, ";");
     if (tok) config->quantum = atoi(tok);
-    
+
     tok = strtok(NULL, ";");
     if (tok) config->alpha = atoi(tok);
-    
+
     // Alocar array de tarefas
     int capacity = 10;
     config->tasks = malloc(capacity * sizeof(TCB));
     config->task_count = 0;
-    
+
     // Ler tarefas
     while (fgets(line, sizeof(line), f)) {
         // Remover newline
         line[strcspn(line, "\r\n")] = '\0';
-        
+
         // Pular linhas vazias ou comentários
         if (strlen(line) < 3 || line[0] == '#') continue;
-        
+
         // Expandir array se necessário
         if (config->task_count >= capacity) {
             capacity *= 2;
             config->tasks = realloc(config->tasks, capacity * sizeof(TCB));
         }
-        
+
         TCB* task = &config->tasks[config->task_count];
-        
+
         // Inicializar tarefa
         memset(task, 0, sizeof(TCB));
         task->start_time = -1;
         task->state = STATE_NEW;
-        
+
         // Parse: id;cor;ingresso;duracao;prioridade;eventos
         char events_str[256] = "";
         int parsed = sscanf(line, "%d;%7[^;];%d;%d;%d;%255[^\n]",
@@ -334,32 +335,32 @@ SimConfig* parse_config(const char* filename) {
                            &task->burst_time,
                            &task->priority,
                            events_str);
-        
+
         if (parsed >= 5) {
             task->remaining_time = task->burst_time;
             task->quantum_remaining = config->quantum;
-            
+
             // Parse eventos (para Projeto B)
             if (strlen(events_str) > 0) {
                 parse_events(task, events_str);
             }
-            
+
             config->task_count++;
         }
     }
-    
+
     fclose(f);
-    
+
     if (config->task_count == 0) {
         printf("Erro: Nenhuma tarefa encontrada no arquivo\n");
         free(config->tasks);
         free(config);
         return NULL;
     }
-    
+
     printf("Configuração carregada: %s, quantum=%d, %d tarefas\n",
            config->algorithm, config->quantum, config->task_count);
-    
+
     return config;
 }
 
@@ -373,37 +374,37 @@ SimConfig* parse_config(const char* filename) {
 Simulator* create_simulator(SimConfig* config) {
     Simulator* sim = malloc(sizeof(Simulator));
     if (!sim) return NULL;
-    
+
     // Inicializar relógio
     sim->clock.current_tick = 0;
     sim->clock.quantum_size = config->quantum;
-    
+
     // Copiar tarefas
     sim->task_count = config->task_count;
     sim->tasks = malloc(sim->task_count * sizeof(TCB));
     memcpy(sim->tasks, config->tasks, sim->task_count * sizeof(TCB));
-    
+
     // Inicializar quantum das tarefas
     for (int i = 0; i < sim->task_count; i++) {
         sim->tasks[i].quantum_remaining = config->quantum;
     }
-    
+
     // Copiar algoritmo
     strncpy(sim->algorithm, config->algorithm, sizeof(sim->algorithm) - 1);
     sim->current_task = NULL;
-    
+
     // Inicializar Gantt
     sim->gantt_capacity = 1000;
     sim->gantt_entries = malloc(sim->gantt_capacity * sizeof(GanttEntry));
     sim->gantt_count = 0;
-    
+
     // Inicializar histórico
     sim->history_capacity = MAX_HISTORY;
     sim->history = malloc(sim->history_capacity * sizeof(Snapshot));
     sim->history_count = 0;
-    
+
     sim->verbose = true;
-    
+
     return sim;
 }
 
@@ -412,14 +413,14 @@ Simulator* create_simulator(SimConfig* config) {
  */
 void destroy_simulator(Simulator* sim) {
     if (!sim) return;
-    
+
     // Liberar histórico
     for (int i = 0; i < sim->history_count; i++) {
         free(sim->history[i].tasks);
         free(sim->history[i].gantt_entries);
     }
     free(sim->history);
-    
+
     free(sim->tasks);
     free(sim->gantt_entries);
     free(sim);
@@ -438,26 +439,26 @@ void save_snapshot(Simulator* sim) {
         // Histórico cheio - remover snapshot mais antigo
         free(sim->history[0].tasks);
         free(sim->history[0].gantt_entries);
-        memmove(&sim->history[0], &sim->history[1], 
+        memmove(&sim->history[0], &sim->history[1],
                 (sim->history_count - 1) * sizeof(Snapshot));
         sim->history_count--;
     }
-    
+
     Snapshot* snap = &sim->history[sim->history_count];
-    
+
     snap->tick = sim->clock.current_tick;
     snap->tasks = copy_tasks(sim->tasks, sim->task_count);
     snap->task_count = sim->task_count;
     snap->current_task_id = sim->current_task ? sim->current_task->id : -1;
     snap->gantt_entries = copy_gantt(sim->gantt_entries, sim->gantt_count);
     snap->gantt_count = sim->gantt_count;
-    
+
     sim->history_count++;
 }
 
 /**
  * Restaura o estado do sistema para um snapshot específico.
- * 
+ *
  * @param sim Simulador
  * @param target_tick Tick para o qual retroceder
  * @return true se conseguiu retroceder, false caso contrário
@@ -471,18 +472,18 @@ bool restore_snapshot(Simulator* sim, int target_tick) {
             break;
         }
     }
-    
+
     if (best_idx < 0) {
         printf("Erro: Não há histórico para o tick %d\n", target_tick);
         return false;
     }
-    
+
     Snapshot* snap = &sim->history[best_idx];
-    
+
     // Restaurar estado
     sim->clock.current_tick = snap->tick;
     memcpy(sim->tasks, snap->tasks, snap->task_count * sizeof(TCB));
-    
+
     // Restaurar current_task
     sim->current_task = NULL;
     if (snap->current_task_id >= 0) {
@@ -493,21 +494,21 @@ bool restore_snapshot(Simulator* sim, int target_tick) {
             }
         }
     }
-    
+
     // Restaurar Gantt
     sim->gantt_count = snap->gantt_count;
     if (snap->gantt_count > 0) {
-        memcpy(sim->gantt_entries, snap->gantt_entries, 
+        memcpy(sim->gantt_entries, snap->gantt_entries,
                snap->gantt_count * sizeof(GanttEntry));
     }
-    
+
     // Remover snapshots posteriores
     for (int i = best_idx + 1; i < sim->history_count; i++) {
         free(sim->history[i].tasks);
         free(sim->history[i].gantt_entries);
     }
     sim->history_count = best_idx + 1;
-    
+
     printf("Estado restaurado para o tick %d\n", snap->tick);
     return true;
 }
@@ -526,7 +527,7 @@ void add_gantt_entry(Simulator* sim, int task_id, int start, int end, const char
         sim->gantt_entries = realloc(sim->gantt_entries,
                                      sim->gantt_capacity * sizeof(GanttEntry));
     }
-    
+
     GanttEntry* entry = &sim->gantt_entries[sim->gantt_count++];
     entry->task_id = task_id;
     entry->start_time = start;
@@ -556,30 +557,30 @@ bool all_tasks_completed(Simulator* sim) {
  */
 TCB* schedule_fifo(Simulator* sim) {
     // Se há uma tarefa rodando e ela não terminou, continua com ela
-    if (sim->current_task && 
+    if (sim->current_task &&
         sim->current_task->state == STATE_RUNNING &&
         sim->current_task->remaining_time > 0) {
         return sim->current_task;
     }
-    
+
     // Procurar a tarefa com menor tempo de chegada entre as prontas
     TCB* next = NULL;
     int earliest_arrival = INT_MAX;
-    
+
     for (int i = 0; i < sim->task_count; i++) {
         TCB* task = &sim->tasks[i];
-        
+
         if (task->arrival_time <= sim->clock.current_tick &&
             task->state != STATE_TERMINATED &&
             task->state != STATE_BLOCKED) {
-            
+
             if (task->arrival_time < earliest_arrival) {
                 earliest_arrival = task->arrival_time;
                 next = task;
             }
         }
     }
-    
+
     return next;
 }
 
@@ -589,13 +590,13 @@ TCB* schedule_fifo(Simulator* sim) {
  */
 TCB* schedule_rr(Simulator* sim) {
     // Se há uma tarefa rodando com quantum restante, continua com ela
-    if (sim->current_task && 
+    if (sim->current_task &&
         sim->current_task->state == STATE_RUNNING &&
         sim->current_task->remaining_time > 0 &&
         sim->current_task->quantum_remaining > 0) {
         return sim->current_task;
     }
-    
+
     // Encontrar o índice da tarefa atual na lista
     int current_idx = -1;
     if (sim->current_task) {
@@ -606,25 +607,25 @@ TCB* schedule_rr(Simulator* sim) {
             }
         }
     }
-    
+
     // Procurar próxima tarefa em ordem circular
     for (int offset = 1; offset <= sim->task_count; offset++) {
         int idx = (current_idx + offset) % sim->task_count;
         if (idx < 0) idx = 0;
-        
+
         TCB* task = &sim->tasks[idx];
-        
+
         if (task->arrival_time <= sim->clock.current_tick &&
             task->state != STATE_TERMINATED &&
             task->state != STATE_BLOCKED &&
             task->remaining_time > 0) {
-            
+
             // Resetar quantum para nova tarefa
             task->quantum_remaining = sim->clock.quantum_size;
             return task;
         }
     }
-    
+
     return NULL;
 }
 
@@ -635,22 +636,22 @@ TCB* schedule_rr(Simulator* sim) {
 TCB* schedule_srtf(Simulator* sim) {
     TCB* next = NULL;
     int shortest_remaining = INT_MAX;
-    
+
     for (int i = 0; i < sim->task_count; i++) {
         TCB* task = &sim->tasks[i];
-        
+
         if (task->arrival_time <= sim->clock.current_tick &&
             task->state != STATE_TERMINATED &&
             task->state != STATE_BLOCKED &&
             task->remaining_time > 0) {
-            
+
             if (task->remaining_time < shortest_remaining) {
                 shortest_remaining = task->remaining_time;
                 next = task;
             }
         }
     }
-    
+
     return next;
 }
 
@@ -661,22 +662,22 @@ TCB* schedule_srtf(Simulator* sim) {
 TCB* schedule_priority(Simulator* sim) {
     TCB* next = NULL;
     int highest_priority = INT_MAX;
-    
+
     for (int i = 0; i < sim->task_count; i++) {
         TCB* task = &sim->tasks[i];
-        
+
         if (task->arrival_time <= sim->clock.current_tick &&
             task->state != STATE_TERMINATED &&
             task->state != STATE_BLOCKED &&
             task->remaining_time > 0) {
-            
+
             if (task->priority < highest_priority) {
                 highest_priority = task->priority;
                 next = task;
             }
         }
     }
-    
+
     return next;
 }
 
@@ -693,7 +694,7 @@ TCB* schedule(Simulator* sim) {
     } else if (strcmp(sim->algorithm, "PRIORITY") == 0) {
         return schedule_priority(sim);
     }
-    
+
     // Algoritmo desconhecido - usar FIFO como padrão
     printf("Aviso: Algoritmo '%s' desconhecido, usando FIFO\n", sim->algorithm);
     return schedule_fifo(sim);
@@ -705,7 +706,7 @@ TCB* schedule(Simulator* sim) {
 
 /**
  * Executa um tick da simulação.
- * 
+ *
  * Ordem das operações:
  * 1. Salvar snapshot para histórico (se necessário)
  * 2. Processar chegadas de tarefas
@@ -719,11 +720,11 @@ TCB* schedule(Simulator* sim) {
 void simulate_tick(Simulator* sim) {
     // Salvar snapshot para permitir retrocesso
     save_snapshot(sim);
-    
+
     // 1. Processar chegadas de novas tarefas
     for (int i = 0; i < sim->task_count; i++) {
         TCB* task = &sim->tasks[i];
-        if (task->arrival_time == sim->clock.current_tick && 
+        if (task->arrival_time == sim->clock.current_tick &&
             task->state == STATE_NEW) {
             task->state = STATE_READY;
             if (sim->verbose) {
@@ -732,14 +733,14 @@ void simulate_tick(Simulator* sim) {
             }
         }
     }
-    
+
     // 2. Selecionar próxima tarefa
     TCB* next_task = schedule(sim);
-    
+
     // 3. Troca de contexto se necessário
     if (next_task != sim->current_task) {
         // Colocar tarefa atual de volta na fila de prontos (se ainda não terminou)
-        if (sim->current_task && 
+        if (sim->current_task &&
             sim->current_task->state == STATE_RUNNING &&
             sim->current_task->remaining_time > 0) {
             sim->current_task->state = STATE_READY;
@@ -748,7 +749,7 @@ void simulate_tick(Simulator* sim) {
                        sim->clock.current_tick, sim->current_task->id);
             }
         }
-        
+
         // Iniciar nova tarefa
         if (next_task) {
             // Registrar tempo de resposta (primeira execução)
@@ -757,25 +758,25 @@ void simulate_tick(Simulator* sim) {
                 next_task->response_time = next_task->start_time - next_task->arrival_time;
             }
             next_task->state = STATE_RUNNING;
-            
+
             if (sim->verbose) {
                 printf("[Tick %3d] Executando tarefa %d (restam %d ticks)\n",
                        sim->clock.current_tick, next_task->id, next_task->remaining_time);
             }
         }
-        
+
         sim->current_task = next_task;
     }
-    
+
     // 4. Executar tarefa atual
     if (sim->current_task) {
         sim->current_task->remaining_time--;
-        
+
         // Decrementar quantum (para RR)
         if (strcmp(sim->algorithm, "RR") == 0) {
             sim->current_task->quantum_remaining--;
         }
-        
+
         // 5. Atualizar Gantt
         // Verificar se podemos estender a última entrada ou precisamos criar nova
         if (sim->gantt_count > 0 &&
@@ -790,27 +791,27 @@ void simulate_tick(Simulator* sim) {
                           sim->clock.current_tick + 1,
                           sim->current_task->color);
         }
-        
+
         // 6. Verificar se a tarefa terminou
         if (sim->current_task->remaining_time == 0) {
             sim->current_task->state = STATE_TERMINATED;
             sim->current_task->completion_time = sim->clock.current_tick + 1;
-            sim->current_task->turnaround_time = 
+            sim->current_task->turnaround_time =
                 sim->current_task->completion_time - sim->current_task->arrival_time;
-            sim->current_task->waiting_time = 
+            sim->current_task->waiting_time =
                 sim->current_task->turnaround_time - sim->current_task->burst_time;
-            
+
             if (sim->verbose) {
                 printf("[Tick %3d] Tarefa %d concluída (turnaround: %d, waiting: %d)\n",
                        sim->clock.current_tick, sim->current_task->id,
                        sim->current_task->turnaround_time,
                        sim->current_task->waiting_time);
             }
-            
+
             sim->current_task = NULL;
         }
     }
-    
+
     // 7. Incrementar tick
     sim->clock.current_tick++;
 }
@@ -826,12 +827,279 @@ void run_complete(Simulator* sim) {
     printf("\n╔══════════════════════════════════════════════════════════════╗\n");
     printf("║           SIMULAÇÃO - Algoritmo: %-10s                  ║\n", sim->algorithm);
     printf("╚══════════════════════════════════════════════════════════════╝\n\n");
-    
+
     while (!all_tasks_completed(sim)) {
         simulate_tick(sim);
     }
-    
+
     printf("\n✓ Simulação concluída em %d ticks\n", sim->clock.current_tick);
+}
+
+// Cores ANSI para o modo debug
+#define DBG_RESET   "\033[0m"
+#define DBG_RED     "\033[31m"
+#define DBG_GREEN   "\033[32m"
+#define DBG_YELLOW  "\033[33m"
+#define DBG_BLUE    "\033[34m"
+#define DBG_MAGENTA "\033[35m"
+#define DBG_CYAN    "\033[36m"
+#define DBG_WHITE   "\033[37m"
+#define DBG_BOLD    "\033[1m"
+#define DBG_DIM     "\033[2m"
+#define DBG_BG_GREEN  "\033[42m"
+#define DBG_BG_YELLOW "\033[43m"
+#define DBG_BG_RED    "\033[41m"
+#define DBG_BG_BLUE   "\033[44m"
+
+/**
+ * Retorna a cor ANSI correspondente a uma cor hexadecimal.
+ */
+static const char* debug_get_color(const char* hex) {
+    if (!hex) return DBG_WHITE;
+    if (strstr(hex, "FF0000") || strstr(hex, "ff0000")) return DBG_RED;
+    if (strstr(hex, "00FF00") || strstr(hex, "00ff00")) return DBG_GREEN;
+    if (strstr(hex, "0000FF") || strstr(hex, "0000ff")) return DBG_BLUE;
+    if (strstr(hex, "FFFF00") || strstr(hex, "ffff00")) return DBG_YELLOW;
+    if (strstr(hex, "FF00FF") || strstr(hex, "ff00ff")) return DBG_MAGENTA;
+    if (strstr(hex, "00FFFF") || strstr(hex, "00ffff")) return DBG_CYAN;
+    return DBG_WHITE;
+}
+
+/**
+ * Imprime o gráfico de Gantt progressivo no modo debug.
+ * Mostra o estado atual da simulação de forma visual.
+ */
+void print_debug_gantt(Simulator* sim) {
+    int current_tick = sim->clock.current_tick;
+    int display_width = 50;  // Largura máxima da visualização
+
+    // Calcular janela de visualização
+    int start_tick = 0;
+    int end_tick = current_tick + 5;  // Mostrar um pouco além do atual
+
+    if (end_tick > display_width) {
+        start_tick = end_tick - display_width;
+    }
+    if (end_tick < display_width) {
+        end_tick = display_width;
+    }
+
+    printf("\n");
+    printf(DBG_BOLD "╔══════════════════════════════════════════════════════════════╗\n");
+    printf("║              GANTT CHART PROGRESSIVO                         ║\n");
+    printf("╚══════════════════════════════════════════════════════════════╝" DBG_RESET "\n");
+
+    // Criar matriz de execução
+    char** matrix = malloc(sim->task_count * sizeof(char*));
+    char** task_colors = malloc(sim->task_count * sizeof(char*));
+
+    for (int i = 0; i < sim->task_count; i++) {
+        matrix[i] = calloc(end_tick + 1, sizeof(char));
+        task_colors[i] = calloc((end_tick + 1) * 10, sizeof(char));
+        memset(matrix[i], ' ', end_tick);
+    }
+
+    // Preencher matriz com execuções do Gantt
+    for (int i = 0; i < sim->gantt_count; i++) {
+        GanttEntry* entry = &sim->gantt_entries[i];
+        for (int t = entry->start_time; t < entry->end_time && t <= end_tick; t++) {
+            if (entry->task_id >= 0 && entry->task_id < sim->task_count) {
+                matrix[entry->task_id][t] = '#';
+                strncpy(&task_colors[entry->task_id][t * 10], entry->color, 7);
+            }
+        }
+    }
+
+    // Escala de tempo
+    printf("\n      ");
+    for (int t = start_tick; t <= end_tick && t < start_tick + display_width; t++) {
+        if (t % 5 == 0) {
+            printf(DBG_DIM "%-5d" DBG_RESET, t);
+        }
+    }
+    printf("\n");
+
+    // Linha do tempo com marcador do tick atual
+    printf("      ");
+    for (int t = start_tick; t <= end_tick && t < start_tick + display_width; t++) {
+        if (t == current_tick) {
+            printf(DBG_BOLD DBG_RED "▼" DBG_RESET);
+        } else if (t % 5 == 0) {
+            printf(DBG_DIM "│" DBG_RESET);
+        } else {
+            printf(DBG_DIM "·" DBG_RESET);
+        }
+    }
+    printf("  " DBG_BOLD "◄ Tick %d" DBG_RESET "\n", current_tick);
+
+    // Linha divisória
+    printf("      ");
+    for (int t = start_tick; t <= end_tick && t < start_tick + display_width; t++) {
+        printf("─");
+    }
+    printf("\n");
+
+    // Mostrar cada tarefa
+    for (int i = 0; i < sim->task_count; i++) {
+        TCB* task = &sim->tasks[i];
+        const char* task_color = debug_get_color(task->color);
+
+        // Indicador de estado atual
+        char state_indicator;
+        const char* state_color;
+        switch (task->state) {
+            case STATE_NEW:        state_indicator = 'N'; state_color = DBG_DIM; break;
+            case STATE_READY:      state_indicator = 'R'; state_color = DBG_YELLOW; break;
+            case STATE_RUNNING:    state_indicator = '*'; state_color = DBG_GREEN; break;
+            case STATE_BLOCKED:    state_indicator = 'B'; state_color = DBG_RED; break;
+            case STATE_TERMINATED: state_indicator = 'D'; state_color = DBG_DIM; break;
+            default:               state_indicator = '?'; state_color = DBG_WHITE;
+        }
+
+        printf("%sT%-2d%s %s%c%s ", task_color, i, DBG_RESET, state_color, state_indicator, DBG_RESET);
+
+        // Desenhar timeline da tarefa
+        for (int t = start_tick; t <= end_tick && t < start_tick + display_width; t++) {
+            if (t < task->arrival_time) {
+                // Antes da chegada
+                printf(DBG_DIM "·" DBG_RESET);
+            } else if (t >= current_tick) {
+                // Futuro (não executado ainda)
+                if (task->state == STATE_TERMINATED) {
+                    printf(DBG_DIM "·" DBG_RESET);
+                } else {
+                    printf(DBG_DIM "░" DBG_RESET);
+                }
+            } else if (matrix[i][t] == '#') {
+                // Executando
+                printf("%s█%s", task_color, DBG_RESET);
+            } else {
+                // Esperando
+                printf(DBG_DIM "·" DBG_RESET);
+            }
+        }
+
+        // Info adicional
+        if (task->state == STATE_TERMINATED) {
+            printf("  " DBG_DIM "[DONE]" DBG_RESET);
+        } else if (task->state == STATE_RUNNING) {
+            printf("  " DBG_GREEN "[%d/%d]" DBG_RESET,
+                   task->burst_time - task->remaining_time, task->burst_time);
+        } else if (task->state == STATE_READY) {
+            printf("  " DBG_YELLOW "[wait]" DBG_RESET);
+        } else if (task->state == STATE_NEW) {
+            printf("  " DBG_DIM "[t=%d]" DBG_RESET, task->arrival_time);
+        }
+
+        printf("\n");
+    }
+
+    // Linha divisória inferior
+    printf("      ");
+    for (int t = start_tick; t <= end_tick && t < start_tick + display_width; t++) {
+        printf("─");
+    }
+    printf("\n");
+
+    // Legenda
+    printf("\n" DBG_BOLD "Legenda:" DBG_RESET " ");
+    printf("█=Executando  ");
+    printf(DBG_DIM "·" DBG_RESET "=Esperando  ");
+    printf(DBG_DIM "░" DBG_RESET "=Futuro  ");
+    printf(DBG_RED "▼" DBG_RESET "=Tick atual\n");
+
+    printf(DBG_BOLD "Estados:" DBG_RESET " ");
+    printf(DBG_DIM "N" DBG_RESET "=New  ");
+    printf(DBG_YELLOW "R" DBG_RESET "=Ready  ");
+    printf(DBG_GREEN "*" DBG_RESET "=Running  ");
+    printf(DBG_RED "B" DBG_RESET "=Blocked  ");
+    printf(DBG_DIM "D" DBG_RESET "=Done\n");
+
+    // Limpar memória
+    for (int i = 0; i < sim->task_count; i++) {
+        free(matrix[i]);
+        free(task_colors[i]);
+    }
+    free(matrix);
+    free(task_colors);
+}
+
+/**
+ * Imprime diagrama visual do estado das tarefas.
+ */
+void print_task_diagram(Simulator* sim) {
+    printf("\n" DBG_BOLD "┌──────────────────────────────────────────────────────┐\n");
+    printf("│                    DIAGRAMA DE ESTADOS                 │\n");
+    printf("└──────────────────────────────────────────────────────────┘" DBG_RESET "\n\n");
+
+    // Mostrar filas
+    printf(DBG_BOLD "  CPU:" DBG_RESET " ");
+    bool cpu_idle = true;
+    for (int i = 0; i < sim->task_count; i++) {
+        if (sim->tasks[i].state == STATE_RUNNING) {
+            const char* color = debug_get_color(sim->tasks[i].color);
+            printf("%s[T%d]%s ", color, i, DBG_RESET);
+            cpu_idle = false;
+        }
+    }
+    if (cpu_idle) printf(DBG_DIM "[idle]" DBG_RESET);
+    printf("\n\n");
+
+    printf(DBG_BOLD "  READY:" DBG_RESET " ");
+    bool ready_empty = true;
+    for (int i = 0; i < sim->task_count; i++) {
+        if (sim->tasks[i].state == STATE_READY) {
+            const char* color = debug_get_color(sim->tasks[i].color);
+            printf("%s[T%d]%s ", color, i, DBG_RESET);
+            ready_empty = false;
+        }
+    }
+    if (ready_empty) printf(DBG_DIM "[vazia]" DBG_RESET);
+    printf("\n\n");
+
+    printf(DBG_BOLD "  WAITING:" DBG_RESET " ");
+    bool waiting_empty = true;
+    for (int i = 0; i < sim->task_count; i++) {
+        if (sim->tasks[i].state == STATE_NEW &&
+            sim->tasks[i].arrival_time > sim->clock.current_tick) {
+            printf(DBG_DIM "[T%d:t=%d]" DBG_RESET " ", i, sim->tasks[i].arrival_time);
+            waiting_empty = false;
+        }
+    }
+    if (waiting_empty) printf(DBG_DIM "[vazia]" DBG_RESET);
+    printf("\n\n");
+
+    printf(DBG_BOLD "  DONE:" DBG_RESET " ");
+    bool done_empty = true;
+    for (int i = 0; i < sim->task_count; i++) {
+        if (sim->tasks[i].state == STATE_TERMINATED) {
+            const char* color = debug_get_color(sim->tasks[i].color);
+            printf("%s[T%d]%s ", color, i, DBG_RESET);
+            done_empty = false;
+        }
+    }
+    if (done_empty) printf(DBG_DIM "[vazia]" DBG_RESET);
+    printf("\n");
+
+    // Barra de progresso geral
+    int total_work = 0;
+    int done_work = 0;
+    for (int i = 0; i < sim->task_count; i++) {
+        total_work += sim->tasks[i].burst_time;
+        done_work += (sim->tasks[i].burst_time - sim->tasks[i].remaining_time);
+    }
+
+    int progress = (total_work > 0) ? (done_work * 30 / total_work) : 0;
+
+    printf("\n" DBG_BOLD "  Progresso:" DBG_RESET " [");
+    for (int i = 0; i < 30; i++) {
+        if (i < progress) {
+            printf(DBG_GREEN "█" DBG_RESET);
+        } else {
+            printf(DBG_DIM "░" DBG_RESET);
+        }
+    }
+    printf("] %d%%\n", (total_work > 0) ? (done_work * 100 / total_work) : 0);
 }
 
 /**
@@ -839,12 +1107,12 @@ void run_complete(Simulator* sim) {
  */
 void print_system_state(Simulator* sim) {
     printf("\n┌─────────────────────────────────────────────────────────┐\n");
-    printf("│ ESTADO DO SISTEMA - Tick: %-4d                          │\n", 
+    printf("│ ESTADO DO SISTEMA - Tick: %-4d                          │\n",
            sim->clock.current_tick);
     printf("├─────────────────────────────────────────────────────────┤\n");
     printf("│ ID │ Estado     │ Chegada │ Burst │ Restante │ Prior. │\n");
     printf("├────┼────────────┼─────────┼───────┼──────────┼────────┤\n");
-    
+
     for (int i = 0; i < sim->task_count; i++) {
         TCB* t = &sim->tasks[i];
         const char* state_str;
@@ -865,45 +1133,84 @@ void print_system_state(Simulator* sim) {
 
 /**
  * Execução passo-a-passo com depuração (req. 1.5.1 e 1.5.2).
+ * Agora inclui visualização gráfica progressiva.
  */
 void run_step_by_step(Simulator* sim) {
     printf("\n╔══════════════════════════════════════════════════════════════╗\n");
     printf("║              MODO DEBUG - PASSO A PASSO                      ║\n");
     printf("╠══════════════════════════════════════════════════════════════╣\n");
     printf("║ Comandos:                                                    ║\n");
-    printf("║   [Enter] - Avançar um tick                                  ║\n");
+    printf("║   [Enter] - Avançar um tick (com gráfico)                    ║\n");
     printf("║   [n]     - Avançar N ticks                                  ║\n");
     printf("║   [b]     - Retroceder um tick                               ║\n");
     printf("║   [g]     - Ir para tick específico                          ║\n");
-    printf("║   [i]     - Inspecionar estado do sistema                    ║\n");
+    printf("║   [v]     - Ver gráfico de Gantt progressivo                 ║\n");
+    printf("║   [d]     - Ver diagrama de estados                          ║\n");
+    printf("║   [i]     - Inspecionar estado do sistema (tabela)           ║\n");
+    printf("║   [a]     - Mostrar tudo (gráfico + diagrama + tabela)       ║\n");
     printf("║   [c]     - Continuar até o fim                              ║\n");
     printf("║   [q]     - Sair                                             ║\n");
     printf("╚══════════════════════════════════════════════════════════════╝\n\n");
-    
+
     char cmd[20];
-    sim->verbose = true;
-    
+    sim->verbose = false;  // Desativar log verboso, usaremos gráfico
+    bool show_graph = true; // Mostrar gráfico automaticamente
+
     // Mostrar estado inicial
-    print_system_state(sim);
-    
+    print_debug_gantt(sim);
+    print_task_diagram(sim);
+
     while (!all_tasks_completed(sim)) {
-        printf("\n[Tick %d] Comando: ", sim->clock.current_tick);
-        
+        printf("\n" DBG_CYAN "[Tick %d]" DBG_RESET " Comando (Enter=avançar, ?=ajuda): ",
+               sim->clock.current_tick);
+
         if (fgets(cmd, sizeof(cmd), stdin) == NULL) {
             printf("\nEntrada encerrada. Saindo.\n");
             break;
         }
-        
+
         // Remover newline
         cmd[strcspn(cmd, "\r\n")] = '\0';
-        
+
         if (strlen(cmd) == 0 || cmd[0] == '\n') {
-            // Enter - avançar um tick
+            // Enter - avançar um tick e mostrar gráfico
             simulate_tick(sim);
+            if (show_graph) {
+                print_debug_gantt(sim);
+            }
+        }
+        else if (cmd[0] == '?') {
+            printf("\nComandos disponíveis:\n");
+            printf("  Enter - Avançar um tick\n");
+            printf("  n     - Avançar N ticks\n");
+            printf("  b     - Retroceder um tick\n");
+            printf("  g     - Ir para tick específico\n");
+            printf("  v     - Ver gráfico de Gantt\n");
+            printf("  d     - Ver diagrama de estados\n");
+            printf("  i     - Inspecionar tabela de tarefas\n");
+            printf("  a     - Mostrar tudo\n");
+            printf("  t     - Toggle: mostrar/ocultar gráfico automático\n");
+            printf("  c     - Continuar até o fim\n");
+            printf("  q     - Sair\n");
         }
         else if (cmd[0] == 'q' || cmd[0] == 'Q') {
             printf("Saindo do modo debug.\n");
             break;
+        }
+        else if (cmd[0] == 't' || cmd[0] == 'T') {
+            show_graph = !show_graph;
+            printf("Gráfico automático: %s\n", show_graph ? "ATIVADO" : "DESATIVADO");
+        }
+        else if (cmd[0] == 'v' || cmd[0] == 'V') {
+            print_debug_gantt(sim);
+        }
+        else if (cmd[0] == 'd' || cmd[0] == 'D') {
+            print_task_diagram(sim);
+        }
+        else if (cmd[0] == 'a' || cmd[0] == 'A') {
+            print_debug_gantt(sim);
+            print_task_diagram(sim);
+            print_system_state(sim);
         }
         else if (cmd[0] == 'c' || cmd[0] == 'C') {
             printf("Continuando execução...\n");
@@ -911,6 +1218,8 @@ void run_step_by_step(Simulator* sim) {
             while (!all_tasks_completed(sim)) {
                 simulate_tick(sim);
             }
+            // Mostrar gráfico final
+            print_debug_gantt(sim);
             break;
         }
         else if (cmd[0] == 'i' || cmd[0] == 'I') {
@@ -921,7 +1230,10 @@ void run_step_by_step(Simulator* sim) {
             int target = sim->clock.current_tick - 1;
             if (target >= 0) {
                 restore_snapshot(sim, target);
-                print_system_state(sim);
+                printf(DBG_YELLOW "← Retrocedido para tick %d" DBG_RESET "\n", target);
+                if (show_graph) {
+                    print_debug_gantt(sim);
+                }
             } else {
                 printf("Já está no início da simulação.\n");
             }
@@ -931,15 +1243,21 @@ void run_step_by_step(Simulator* sim) {
             int target;
             if (scanf("%d", &target) == 1) {
                 getchar(); // Consumir newline
+                if (target < 0) target = 0;
+
                 if (target < sim->clock.current_tick) {
                     restore_snapshot(sim, target);
-                } else {
-                    // Avançar até o tick desejado
+                    printf(DBG_YELLOW "← Retrocedido para tick %d" DBG_RESET "\n", target);
+                } else if (target > sim->clock.current_tick) {
+                    printf("Avançando para tick %d...\n", target);
                     while (sim->clock.current_tick < target && !all_tasks_completed(sim)) {
                         simulate_tick(sim);
                     }
+                    printf(DBG_GREEN "→ Avançado para tick %d" DBG_RESET "\n", sim->clock.current_tick);
                 }
-                print_system_state(sim);
+                if (show_graph) {
+                    print_debug_gantt(sim);
+                }
             }
         }
         else if (cmd[0] == 'n' || cmd[0] == 'N') {
@@ -947,18 +1265,24 @@ void run_step_by_step(Simulator* sim) {
             int n;
             if (scanf("%d", &n) == 1) {
                 getchar(); // Consumir newline
-                for (int i = 0; i < n && !all_tasks_completed(sim); i++) {
+                printf("Avançando %d ticks...\n", n);
+                for (int j = 0; j < n && !all_tasks_completed(sim); j++) {
                     simulate_tick(sim);
+                }
+                if (show_graph) {
+                    print_debug_gantt(sim);
                 }
             }
         }
         else {
-            printf("Comando desconhecido. Use: Enter, n, b, g, i, c, ou q\n");
+            printf(DBG_DIM "Comando desconhecido. Digite '?' para ajuda." DBG_RESET "\n");
         }
     }
-    
+
     if (all_tasks_completed(sim)) {
-        printf("\n✓ Todas as tarefas concluídas!\n");
+        printf("\n" DBG_GREEN "✓ Todas as tarefas concluídas!" DBG_RESET "\n");
+        print_debug_gantt(sim);
+        print_task_diagram(sim);
     }
 }
 
@@ -975,26 +1299,26 @@ void print_statistics_simple(Simulator* sim) {
     printf("╠════╦═════════╦═══════╦══════════╦════════════╦═══════════════╣\n");
     printf("║ ID ║ Chegada ║ Burst ║ Término  ║ Turnaround ║ Tempo Espera  ║\n");
     printf("╠════╬═════════╬═══════╬══════════╬════════════╬═══════════════╣\n");
-    
+
     float avg_turnaround = 0;
     float avg_waiting = 0;
     float avg_response = 0;
-    
+
     for (int i = 0; i < sim->task_count; i++) {
         TCB* t = &sim->tasks[i];
         printf("║ %2d ║ %7d ║ %5d ║ %8d ║ %10d ║ %13d ║\n",
                t->id, t->arrival_time, t->burst_time,
                t->completion_time, t->turnaround_time, t->waiting_time);
-        
+
         avg_turnaround += t->turnaround_time;
         avg_waiting += t->waiting_time;
         avg_response += t->response_time;
     }
-    
+
     avg_turnaround /= sim->task_count;
     avg_waiting /= sim->task_count;
     avg_response /= sim->task_count;
-    
+
     printf("╠════╩═════════╩═══════╩══════════╩════════════╩═══════════════╣\n");
     printf("║ Médias:  Turnaround = %6.2f  |  Waiting = %6.2f           ║\n",
            avg_turnaround, avg_waiting);
@@ -1051,14 +1375,14 @@ int main(int argc, char* argv[]) {
         print_usage(argv[0]);
         return 1;
     }
-    
+
     // Parse de argumentos
     const char* config_file = NULL;
     bool step_mode = false;
     bool auto_bmp = false;
     bool auto_ascii = false;
     bool quiet = false;
-    
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
@@ -1080,19 +1404,19 @@ int main(int argc, char* argv[]) {
             config_file = argv[i];
         }
     }
-    
+
     if (!config_file) {
         printf("Erro: Arquivo de configuração não especificado\n");
         print_usage(argv[0]);
         return 1;
     }
-    
+
     // Carregar configuração
     SimConfig* config = parse_config(config_file);
     if (!config) {
         return 1;
     }
-    
+
     // Criar simulador
     Simulator* sim = create_simulator(config);
     if (!sim) {
@@ -1101,18 +1425,18 @@ int main(int argc, char* argv[]) {
         free(config);
         return 1;
     }
-    
+
     sim->verbose = !quiet;
-    
+
     // Executar simulação
     if (step_mode) {
         run_step_by_step(sim);
     } else {
         run_complete(sim);
     }
-    
+
     int max_time = sim->clock.current_tick;
-    
+
     // Estatísticas
     if (!quiet) {
         if (!auto_bmp && !auto_ascii) {
@@ -1131,7 +1455,7 @@ int main(int argc, char* argv[]) {
                     stats[i].priority = t->priority;
                 }
                 show_statistics(stats, sim->task_count, sim->algorithm);
-                
+
                 if (ask_yes_no("Exportar estatísticas para CSV?")) {
                     export_to_csv(stats, sim->task_count, sim->algorithm);
                 }
@@ -1143,22 +1467,22 @@ int main(int argc, char* argv[]) {
             print_statistics_simple(sim);
         }
     }
-    
+
     // Gantt ASCII
     if (auto_ascii || (!quiet && !auto_bmp && ask_yes_no("\nExibir Gantt Chart ASCII?"))) {
         print_gantt_ascii(sim->gantt_entries, sim->gantt_count, max_time, sim->task_count);
     }
-    
+
     // Gantt BMP
     if (auto_bmp || (!quiet && ask_yes_no("\nGerar gráfico de Gantt (BMP)?"))) {
         create_gantt_bmp("gantt_output.bmp", sim->gantt_entries,
                         sim->gantt_count, max_time, sim->task_count);
     }
-    
+
     // Liberar memória
     destroy_simulator(sim);
     free(config->tasks);
     free(config);
-    
+
     return 0;
 }

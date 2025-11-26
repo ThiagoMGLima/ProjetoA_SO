@@ -13,16 +13,16 @@ TARGET = simulador
 INTERFACE_SRC = interface.c gantt_bmp.c gantt_ascii.c
 INTERFACE_TARGET = interface
 
-# Regra principal
-all: $(TARGET)
+# Regra principal - compila simulador e interface
+all: $(TARGET) $(INTERFACE_TARGET)
 
 # Compilar o simulador
 $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
-# Compilar interface
-interface: $(INTERFACE_SRC)
-	$(CC) $(CFLAGS) -o $(INTERFACE_TARGET) $^ -lm
+# Compilar interface (depende dos objetos necessários)
+$(INTERFACE_TARGET): interface.o gantt_bmp.o gantt_ascii.o
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 # Regra genérica para objetos
 %.o: %.c
@@ -30,7 +30,7 @@ interface: $(INTERFACE_SRC)
 
 # Limpar arquivos gerados
 clean:
-	rm -f $(OBJECTS) $(TARGET) $(INTERFACE_TARGET) *.bmp *.csv
+	rm -f $(OBJECTS) interface.o $(TARGET) $(INTERFACE_TARGET) *.bmp *.csv
 
 # Teste rápido
 test: $(TARGET)
@@ -48,5 +48,6 @@ simulador.o: simulador.c gantt_bmp.h gantt_ascii.h stats_viewer.h
 gantt_bmp.o: gantt_bmp.c gantt_bmp.h
 gantt_ascii.o: gantt_ascii.c gantt_ascii.h gantt_bmp.h
 stats_viewer.o: stats_viewer.c stats_viewer.h
+interface.o: interface.c gantt_bmp.h gantt_ascii.h
 
-.PHONY: all clean test interface
+.PHONY: all clean test
